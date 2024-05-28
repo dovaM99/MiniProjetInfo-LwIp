@@ -9,7 +9,7 @@ Cette partie préliminaire consiste en une implémentation simple d'un serveur e
 
 Le serveur ferme automatiquement la connexion avec un client si aucune activité n'est détectée pendant 10 secondes.
 
-![Architecture de communication client/serveur utilisé](client/serveur.png)
+![Architecture de communication client_serveur utilisé](client_serveur.png)
 
 ## Fonctionnalités
 
