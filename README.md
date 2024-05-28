@@ -1,6 +1,13 @@
-# Serveur et Clients TCP avec Timeout
+# Clients/Serveur TCP à l'aide de LWIP
 
-Ce projet contient une implémentation simple d'un serveur et de deux clients qui communiquent via TCP. Le serveur ferme automatiquement la connexion avec un client si aucune activité n'est détectée pendant 10 secondes.
+Ce projet consiste réaliser une communication TCP entre la carte microcontrolleur STM32 (client) et un ordinateur (le serveur) à l'aide de l'API LwIP. 
+
+
+# Première Partie : Communication local entre deux processus (clients) et un autre (serveur) sur la même machine 
+
+Cette partie préliminaire consiste en une implémentation simple d'un serveur et de deux clients qui communiquent via TCP. 
+
+Le serveur ferme automatiquement la connexion avec un client si aucune activité n'est détectée pendant 10 secondes.
 
 ## Fonctionnalités
 
@@ -12,28 +19,64 @@ Ce projet contient une implémentation simple d'un serveur et de deux clients qu
 
 Le serveur est implémenté en Python et utilise les sockets avec un mécanisme de timeout pour gérer l'inactivité.
 
- - Écoute sur localhost et un port spécifique.
- - Accepte une connexion.
- - Lit les données envoyées par le client et les renvoie (comportement d'écho).
+ - Initialise le serveur socket en IPv4 (AF_INET) et TCP (SOCK_STREAM).
+  ```python
+  server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  ```
+  
+- Configure l'option SO_REUSEADDR pour réutiliser l'adresse et le port.
+  ```python
+  server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+  ```
 
-```python
-# Code du serveur ici
-import socket
-import select
-import time
+-  Le serveur  est configuré à l'adresse IP '127.0.0.1' et au port 12345, puis démarre l'écoute.
+  ```python
+  server_socket.bind((host, port))
+  server_socket.listen()
+  ```
 
-def server():
-    host = '127.0.0.1'
-    port = 12345
-    ...
-```
+- Utilise `select` pour surveiller plusieurs sockets avec un timeout de 10 secondes.
+  ```python
+  read_sockets, _, exception_sockets = select.select(sockets_list, [], sockets_list, 10)
+  ```
 
+- Vérifie l'inactivité des clients et ferme les connexions inactives depuis plus de 10 secondes.
+  ```python
+  if time.time() - last_active.get(client_socket, 0) > 10:
+      client_socket.close()
+  ```
+
+- Accepte les nouvelles connexions et les ajoute à la liste des sockets et au dictionnaire des clients.
+  ```python
+  client_socket, client_address = server_socket.accept()
+  sockets_list.append(client_socket)
+  clients[client_socket] = client_address
+  ```
+
+- Reçoit les messages des clients, met à jour leur dernier temps d'activité, et envoie une réponse.
+  ```python
+  message = notified_socket.recv(1024)
+  notified_socket.send(response_message.encode())
+  ```
+
+- Gère les exceptions en supprimant les sockets défaillants de la liste et en fermant les connexions.
+  ```python
+  sockets_list.remove(notified_socket)
+  del clients[notified_socket]
+  notified_socket.close()
+  ```
 Le serveur utilise maintenant select pour gérer plusieurs connexions de manière non bloquante.
 
 ## Les clients 
 
 Les clients fonctionnent comme suit : 
 
+- Ils parlent au serveur sur l'adresse '127.0.0.1' qui une adresse standard pour des communications loopback (avec le même hôte) et sur le port 12345 (port choisit au hasard, il doit juste être libre d'usage).
+- Crée un client socket utilisant IPv4 (AF_INET) et TCP (SOCK_STREAM).
+- Se connecte au serveur à l'adresse IP '127.0.0.1' ( adresse de loopback , cad avec le même hôte) et au port 12345.
+- Affiche un message confirmant la connexion au serveur.
+- Envoie le message 'Hello, server! from Client 1' au serveur.
+- Reçoit une réponse du serveur et affiche la donnée reçue en la décodant.
 ```python
 
 def client():
@@ -47,5 +90,4 @@ def client():
         data = s.recv(1024)
         print(f"Client 1 reçu: {data.decode()}")
 ```
-Chaque client se connecte au serveur et envoie un message identifié. Le serveur écoute tous les clients connectés et répond à chacun d'eux individuellement, en indiquant explicitement à quel client il parle. 
-Vous pouvez lancer le serveur d'abord, puis ouvrir deux terminaux distincts pour chaque client pour voir le système en action.
+Ainsi, chaque client se connecte au serveur et envoie un message identifié. Le serveur écoute tous les clients connectés et répond à chacun d'eux individuellement, en indiquant explicitement à quel client il parle. 
