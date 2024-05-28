@@ -9,6 +9,8 @@ Cette partie préliminaire consiste en une implémentation simple d'un serveur e
 
 Le serveur ferme automatiquement la connexion avec un client si aucune activité n'est détectée pendant 10 secondes.
 
+![Architecture de communication client/serveur utilisé](client/serveur.png)
+
 ## Fonctionnalités
 
 - Serveur TCP qui écoute les connexions entrantes.
@@ -91,3 +93,67 @@ def client():
         print(f"Client 1 reçu: {data.decode()}")
 ```
 Ainsi, chaque client se connecte au serveur et envoie un message identifié. Le serveur écoute tous les clients connectés et répond à chacun d'eux individuellement, en indiquant explicitement à quel client il parle. 
+
+## Résulatat des échanges 
+
+![Connexion du client1](client1.png)
+![Connexion du client2](client2.png)
+![Les echanges avec le serveur](serveur.png)
+
+# Deuxième Partie : Communication entre deux processus (clients) émulant par freertos à l'aide de la carte STM32 et un serveur correspondant au PC
+
+## Configurations 
+
+- Activer Freertos (ordonancement des tâches) et ETH (activation d'ethernet pour le support physique) sur STM32IDE (dans l'onglet : Middleware and software Packs/Connectivity)
+- Activer Lwip (Middleware and software Packs) , et configurer une adresse ip fixe à la carte
+![Exemple de configuration d'adresse ip fixe sur STM32CubeIDE](ip.png)
+- On Crée deux taches pour les deux clients.
+- On fixe l'adresse ip du pc à "192.168.1.100" (choix arbitraire)
+- On Crée un script python pour le serveur.
+
+## Serveur 
+Le code du serveur ne change pas, à l'exception de l'adresse ip qui devient celle qu'on a fixé à la machine.
+## clients 
+
+Ici le code change, car on programme les deux tâches en C. 
+
+- On Crée un nom de client unique basé sur l'argument `arg`.
+  ```c
+  snprintf(client_name, 16, "Client %d", (int)arg);
+  ```
+
+- On initialise et crée un socket TCP.
+  ```c
+  sock = lwip_socket(AF_INET, SOCK_STREAM, 0);
+  ```
+
+- On configure l'adresse du serveur en spécifiant l'adresse IP et le port.
+  ```c
+  memset(&server_address, 0, sizeof(server_address));
+  server_address.sin_family = AF_INET;
+  server_address.sin_port = htons(SERVER_PORT);
+  server_address.sin_addr.s_addr = inet_addr(SERVER_IP);
+  ```
+
+- On se connecte au serveur avec les informations configurées.
+  ```c
+  if (lwip_connect(sock, (struct sockaddr *)&server_address, sizeof(server_address)) < 0) {
+      lwip_close(sock);
+      vTaskDelete(NULL);
+      return;
+  }
+  ```
+
+- On envoie un message au serveur une fois la connexion établie.
+  ```c
+  lwip_send(sock, message, strlen(message), 0);
+  ```
+
+- On ferme le socket et termine la tâche.
+  ```c
+  lwip_close(sock);
+  vTaskDelete(NULL);
+  ```
+
+
+
